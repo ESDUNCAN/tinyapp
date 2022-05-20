@@ -4,16 +4,17 @@ const PORT = 8080; // default port 8080
 const bodyParser = require("body-parser");
 const cookieParser = require('cookie-parser')
 const cookieSession = require('cookie-session')
+const bcrypt = require('bcryptjs');
 
 
 app.use(cookieParser())
 app.use(bodyParser.urlencoded({ extended: true }));
-// app.use(cookieSession({
-//   name: 'session',
-//   keys: ["bootcamp"],
-//   // Cookie Options
-//   maxAge: 24 * 60 * 60 * 1000 // 24 hours
-// }));
+app.use(cookieSession({
+  name: 'session',
+  keys: ["bootcamp"],
+  // Cookie Options
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+}));
 
 app.set("view engine", "ejs");
 
@@ -93,7 +94,7 @@ app.post("/urls", (req, res) => {
   // store short + long in database
   urlDatabase[newshortURL] = {
     longURL: newLongURL,
-    userID: req.cookies["user_id"]
+    userID: req.session["user_id"]
   }
   res.redirect(`/urls/${newshortURL}`);
 });
@@ -113,8 +114,8 @@ app.post("/register", (req, res) => {
   }
 
   const id = generateRandomString(6)
-  users[id] = { id, email, password }
-  res.cookie("user_id", id)
+  users[id] = { id, email, password: bcrypt.hashSync(password, 10) }
+  req.session.user_id = id
   console.log(users)
   res.redirect("/urls")
 })
@@ -150,15 +151,16 @@ app.post("/login", (req, res) => {
   if (!user) {
     return res.status(403).send("Unauthorized")
   }
-  if (password !== user.password) {
+  const hashedPassword = user.password
+  if (bcrypt.compareSync(password, hashedPassword)) {
     return res.status(403).send("Unauthorized")
   }
-  res.cookie("user_id", user.id)
+  req.session.user_id = user.id
   res.redirect("/urls")
 })
 
 app.post("/logout", (req, res) => {
-  res.clearCookie("user_id")
+  req.session.user_id = null
   res.redirect("/urls")
 })
 
@@ -176,7 +178,7 @@ app.get("/hello", (req, res) => {
 });
 
 app.get("/urls/new", (req, res) => {
-  const user_id = req.cookies["user_id"]
+  const user_id = req.session["user_id"]
   const user = users[user_id]
   const templateVars = { user: user }
   if (user) {
@@ -193,9 +195,9 @@ app.get("/urls.json", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const test = req.cookies
+  const test = req.session
   console.log('Cookies: ', test)
-  const user_id = req.cookies["user_id"]
+  const user_id = req.session["user_id"]
   const user = users[user_id] || null
   const templateVars = { urls: urlsForUser(user_id, urlDatabase), user, error: "Please login/register to access this page" };
   // ... any other vars
@@ -206,7 +208,7 @@ app.get("/urls", (req, res) => {
 app.get("/urls/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL
   const longURL = urlDatabase[shortURL].longURL
-  const user_id = req.cookies["user_id"]
+  const user_id = req.session["user_id"]
   const user = users[user_id]
   const urlforUsers = urlsForUser(user_id, urlDatabase)
   if (!Object.keys(urlforUsers).length) {
@@ -221,14 +223,14 @@ app.get("/", (req, res) => {
 });
 
 app.get('/register', (req, res) => {
-  const user_id = req.cookies["user_id"]
+  const user_id = req.session["user_id"]
   const user = users[user_id]
   const templateVars = { urls: urlDatabase, user };
   res.render("register", templateVars)
 })
 
 app.get('/login', (req, res) => {
-  const user_id = req.cookies["user_id"]
+  const user_id = req.session["user_id"]
   const user = users[user_id]
   const error = req.query.e
   const templateVars = { urls: urlDatabase, user, error };
