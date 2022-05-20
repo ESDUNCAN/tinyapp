@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const cookieParser = require('cookie-parser')
 const cookieSession = require('cookie-session')
 const bcrypt = require('bcryptjs');
+const { existingEmails } = require('./helpers')
 
 
 app.use(cookieParser())
@@ -57,15 +58,15 @@ const urlDatabase = {
 //   "9sm5xK": "http://www.google.com"
 // };
 
-const existingEmails = function (email) {
-  for (let key in users) {
-    if (users[key].email === email) {
-      return true
-    }
-  } return false
-}
+// const existingEmails = function (email, urlDatabase) {
+//   for (let key in users) {
+//     if (users[key].email === email) {
+//       return true
+//     }
+//   } return false
+// }
 
-const existingUser = function (email) {
+const existingUser = function (email, urlDatabase) {
   for (let key in users) {
     if (users[key].email === email) {
       return users[key]
@@ -108,7 +109,7 @@ app.post("/register", (req, res) => {
     return
   }
 
-  if (existingEmails(email)) {
+  if (existingEmails(email, users)) {
     res.status(400).send("email already exists")
     return
   }
